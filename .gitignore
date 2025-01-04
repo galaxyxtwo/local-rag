@@ -1,0 +1,4 @@
+models/
+model_cache/
+chroma_db/
+__pycache__/

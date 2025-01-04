@@ -1,0 +1,5 @@
+
+    Artificial intelligence (AI) is intelligence demonstrated by machines. 
+    AI can be categorized as either weak AI or strong AI. Weak AI is designed 
+    for a particular task, while strong AI generalizes human cognitive abilities.
+    
