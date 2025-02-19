@@ -1,6 +1,7 @@
 # Local RAG Implementation with LangChain
 
 This project implements a Retrieval-Augmented Generation (RAG) system using LangChain, allowing users to query documents using local LLMs.
+![supportAgentDiagram](https://github.com/user-attachments/assets/c2af8ad3-8539-4439-a64c-9d92867e5d42)
 
 ## Setup
 
