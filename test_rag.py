@@ -1,17 +1,46 @@
-import sys
-import subprocess
-import pkg_resources
-import os
-
+mport os
+from typing import Any, List, Optional
+from langchain_core.runnables import Runnable
+from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain.text_splitter import RecursiveCharacterTextSplitter  # Changed import
 from langchain_community.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings  # Changed import
 from langchain_community.vectorstores import Chroma
-from langchain_community.llms import LlamaCpp
 from langchain.chains import RetrievalQA
+from langchain_core.prompts import PromptTemplate
+from langchain_core.language_models import LLM
+
+class LilypadLLM(LLM, Runnable):
+    """Custom LLM class that implements the Runnable interface"""
+    
+    module_version: str = "github.com/noryev/module-llama2:6d4fd8c07b5f64907bd22624603c2dd54165c215"
+    target_address: str = "0xA7f9BD3837279C3776B17b952D97C619f3892BDE"
+
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Execute the LLM call."""
+        escaped_prompt = prompt.replace('"', '\\"')
+        
+        command = (
+            f'lilypad run {self.module_version} '
+            f'-i prompt="{escaped_prompt}" '
+            f'--target {self.target_address} '
+            f'--web3-private-key WEB3_PRIVATE_KEY'
+        )
+        
+        return os.popen(command).read().strip()
+
+    @property
+    def _llm_type(self) -> str:
+        """Return type of LLM."""
+        return "lilypad"
 
 def main():
-    # Verify document exists and is readable
     doc_path = "./docs/lilypadIssues.md"
     if not os.path.exists(doc_path):
         print(f"ERROR: Document not found at {doc_path}")
@@ -44,44 +73,32 @@ def main():
 
     print("\nCreating vector store...")
     try:
-        # Store the vectorstore in a variable we'll use later
         vectorstore = Chroma.from_documents(
             documents=splits,
             embedding=embeddings,
             persist_directory="./chroma_db"
         )
-        print("Vector store created successfully!")
     except Exception as e:
         print(f"Error creating vector store: {e}")
         return
 
-    print("\nInitializing LLM...")
-    try:
-        model_path = "./models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-        if not os.path.exists(model_path):
-            print(f"ERROR: Model not found at {model_path}")
-            return
-        
-        llm = LlamaCpp(
-            model_path=model_path,
-            n_gpu_layers=-1,
-            n_ctx=4096,
-            temperature=0.7
-        )
-        print("LLM initialized successfully!")
-    except Exception as e:
-        print(f"Error initializing LLM: {e}")
-        return
+    # Initialize the custom LilypadLLM
+    lilypad_llm = LilypadLLM()
 
     print("\nCreating QA chain...")
     try:
         qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
+            llm=lilypad_llm,
             chain_type="stuff",
             retriever=vectorstore.as_retriever(),
-            return_source_documents=True
+            return_source_documents=True,
+            chain_type_kwargs={
+                "prompt": PromptTemplate(
+                    template="Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.\n\nContext: {context}\n\nQuestion: {question}\n\nHelpful Answer:",
+                    input_variables=["context", "question"]
+                )
+            }
         )
-        print("QA chain created successfully!")
     except Exception as e:
         print(f"Error creating QA chain: {e}")
         return
@@ -91,10 +108,14 @@ def main():
         question = input("\nEnter your question (or 'quit' to exit): ")
         if question.lower() == 'quit':
             break
+        
         print("\nThinking...")
         try:
-            response = qa_chain(question)
-            print("\nAnswer:", response['result'])
+            result = qa_chain.invoke({"query": question})
+            if isinstance(result, dict):
+                print("\nAnswer:", result.get('result', 'No answer found'))
+            else:
+                print("\nAnswer:", result)
         except Exception as e:
             print(f"Error processing question: {e}")
 
