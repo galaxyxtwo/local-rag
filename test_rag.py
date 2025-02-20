@@ -30,7 +30,7 @@ class LilypadLLM(LLM, Runnable):
             f'lilypad run {self.module_version} '
             f'-i prompt="{escaped_prompt}" '
             f'--target {self.target_address} '
-            f'--web3-private-key WEB3_PRIVATE_KEY'
+            f'--web3-private-key 9acff1b8f06ea9661a2da8e63e4c59fe6fb4e7bd7d727a13799050d4f9f14323'
         )
         
         return os.popen(command).read().strip()
